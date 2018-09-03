@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=Argon Browser
-GenericName=Python GTK Boilerplate
-Comment=A sample python GTK application
-Exec=boilerplate
-Terminal=false
+Version=1.1
 Type=Application
-StartupNotify=true
-StartupWmClass=boilerplate
-Icon=boilerplate
+Name=Argon Floating Browser
+GenericName=Argon Floating Browser
+Comment=Minimal floating browser window
+Icon=/usr/local/share/pixmaps/argon.browser.svg
+Exec=python main.py
+Path=/opt/argon-browser
+Actions=
 Categories=Internet;

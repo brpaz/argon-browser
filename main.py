@@ -4,141 +4,186 @@ import gi
 import re
 import sys
 import signal
+import os
+import shutil
+import logging
+import json
 
 gi.require_version('Gtk', '3.0')
 gi.require_version('WebKit2', '4.0')
 
-from gi.repository import Gtk, GLib, Gio, WebKit2
+from gi.repository import Gtk, GLib, Gio, WebKit2, GObject, Gdk
 
-class AppWindow(Gtk.ApplicationWindow):
+logger = logging.getLogger("main")
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-    def is_loading(self, view, data):
-        print view.is_loading()
+APPLICATION_NAME = "argon-browser"
+USER_AGENT_MOBILE = "Mozilla/5.0 (Linux; Android 8.1.0; Pixel Build/OPM4.171019.021.D1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.158 Mobile Safari/537.36"
+USER_AGENT_DESKTOP = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36"
 
-    def on_load_changed(self, webview, event):
-        url = webview.get_uri()
-        
-        if event == WebKit2.LoadEvent.FINISHED:
-            self.address_bar.set_text(url)
 
-    def on_load_failed(self, webview, event, url, error):
-        print("Error loading", url, "-", error)
+class AppWindow(object):
+    """ Main browser window """
+
+    def __init__(self, application):
+        """ Init window """
+
+        self.app = application
+
+        self.create_widgets()
+
+        # Fire up the main window
+        self.MainWindow = self.builder.get_object("MainWindow")
+        self.MainWindow.set_application(application)
+        self.MainWindow.set_keep_above(True)
+
+        self.MainWindow.set_icon_from_file(
+            os.path.join(self.app.app_dir, 'data', 'icons', 'icon.png'))
+        screen = self.MainWindow.get_screen()
+        self.MainWindow.move(screen.get_width(), screen.get_width(
+        ) - self.MainWindow.get_default_size().width)
+
+        self.MainWindow.show_all()
 
     def create_widgets(self):
+        """ Creates the widgets for the window """
+        # Read GUI from file and retrieve objects from Gtk.Builder
+        self.builder = Gtk.Builder.new_from_file("glade/main.glade")
+        self.builder.connect_signals(self)
 
         self.webview = WebKit2.WebView()
         self.webview.connect("notify::is-loading", self.is_loading)
         self.webview.connect("load-changed",
-                              self.on_load_changed)
+                             self.on_load_changed)
         self.webview.connect("load-failed", self.on_load_failed)
+        self.webview.connect("decide-policy", self.on_policy_decision)
 
         webviewSettings = WebKit2.Settings(
-            enable_fullscreen=False,
+            enable_fullscreen=True,
             enable_smooth_scrolling=True,
             enable_dns_prefetching=True,
             enable_webgl=True,
             enable_media_stream=True,
-            enable_mediasource=True
+            enable_mediasource=True,
+            enable_encrypted_media=True,
+            enable_developer_extras=True
         )
-        webviewSettings.set_user_agent(
-            "Mozilla/5.0 (Linux; Android 8.1.0; Pixel Build/OPM4.171019.021.D1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.158 Mobile Safari/537.36")
 
-        self.webview.set_settings(webviewSettings)
-        self.go_back = Gtk.Button()
+        self.webview.load_uri(self.app.get_config()['homepage'])
+        container = self.builder.get_object("main_container")
+        container.add(self.webview)
 
-        self.go_back.add(Gtk.Image.new_from_gicon(
-            Gio.ThemedIcon(name="back"), Gtk.IconSize.BUTTON))
-        self.go_back.connect("clicked", lambda x: self.webview.go_back())
-        self.go_forward = Gtk.Button()
-        self.go_forward.add(Gtk.Image.new_from_gicon(
-             Gio.ThemedIcon(name="next"), Gtk.IconSize.BUTTON))
-        self.go_forward.connect("clicked", lambda x: self.webview.go_forward())
+        self.webview.show_all()
 
-        self.reload = Gtk.Button()
+    def on_back_btn_clicked(self, widget):
+        """ Handles the click on the browsers back button """
+        self.webview.go_back()
 
-        self.reload.add(Gtk.Image.new_from_gicon(
-             Gio.ThemedIcon(name="reload"), Gtk.IconSize.BUTTON))
-        self.reload.connect("clicked", lambda x: self.webview.reload())
+    def on_btn_forward_clicked(self, widget):
+        self.webview.go_forward()
 
-        hb = Gtk.HeaderBar()
-        hb.set_show_close_button(False)
+    def on_btn_refresh_clicked(self, widget):
+        self.webview.reload()
 
-        close_button = Gtk.Button()
-        close_button.connect("clicked", lambda x: self.destroy())
+    def on_btn_close_clicked(self, widget):
+        self.MainWindow.destroy()
 
-        close_button.add(
-            Gtk.Image.new_from_gicon(
-                Gio.ThemedIcon(name="cancel"), Gtk.IconSize.BUTTON))
-
-        settings_button = Gtk.Button()
-        settings_button.add(
-            Gtk.Image.new_from_gicon(
-                Gio.ThemedIcon(name="settings"), Gtk.IconSize.BUTTON))
-
-        #settings_button.connect("clicked", self.on_settings_click)
-        hb.pack_end(close_button)
-        hb.pack_end(settings_button)
-        hb.pack_start(self.go_back)
-        hb.pack_start(self.go_forward)
-        hb.pack_start(self.reload)
-
-        self.address_bar = Gtk.Entry()
-        self.address_bar.set_width_chars(50)
-        self.address_bar.connect("activate", self.load_url)
-        hb.set_custom_title(self.address_bar)
-
-        self.set_titlebar(hb)
-
-        self.scrolled_window = Gtk.ScrolledWindow()
-        self.scrolled_window.add_with_viewport(self.webview)
-
-        self.add(self.scrolled_window)
-
-    def __init__(self, *args, **kwargs):
-        super(AppWindow, self).__init__(*args, **kwargs)
-
-        self.set_title("Argon Browser")
-       
-        self.set_default_size(600, 400)
-        self.set_keep_above(True)
-        self.set_resizable(True)
-        self.set_position(Gtk.WindowPosition.CENTER)
-  
-        self.create_widgets()
-
-        self.webview.load_uri("https://duckduckgo.com/")
-        self.show_all()
- 
-    def load_url(self, widget):
+    def on_search_input(self, widget):
+        """ Handles the url change of search bar """
         url = widget.get_text()
 
-        if not re.match("^(?!:\/\/)([a-zA-Z0-9-_]+\.)*[a-zA-Z0-9][a-zA-Z0-9-_]+\.[a-zA-Z]{2,11}?$", url):
+        if not re.match("^(http(s)?(:\/\/))?(www\.)?[a-zA-Z0-9-_\.]+\.[a-z]+$", url):
             self.webview.load_uri("https://www.google.pt/search?q=" + url)
             return
-        
+
         if not "://" in url:
-            url = "http://" + url
+            url = "https://" + url
+
+        use_mobile_version = any(
+            x for x in self.app.config['mobile_version'] if x in url)
+
+        if use_mobile_version:
+            logger.info("Loading mobile version for %s" % url)
+            self.webview.get_settings().set_user_agent(USER_AGENT_MOBILE)
+        else:
+            self.webview.get_settings().set_user_agent(USER_AGENT_DESKTOP)
+
         self.webview.load_uri(url)
 
+    def on_btn_open_in_default_browser_clicked(self, widget):
+        uri = self.webview.get_uri()
+        Gio.app_info_launch_default_for_uri(uri)
+        self.MainWindow.destroy()
+
+    def is_loading(self, view, data):
+        pass
+
+    def on_load_changed(self, webview, event):
+        """ Handle the Load event on the webview """
+        url = webview.get_uri()
+        logger.info("Navigating to url: " + url)
+
+        if event == WebKit2.LoadEvent.STARTED:
+            search_bar = self.builder.get_object("search_bar")
+            search_bar.set_text(url)
+
+    def on_policy_decision(self, webview, decision, decision_type):
+        if decision_type == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
+
+            if not self.app.config['embeded_redirects']['enabled']:
+                return True
+
+            for site in self.app.config['embeded_redirects']['sites']:
+                match = re.findall(site["pattern"], webview.get_uri())
+
+                if match:
+                    logger.info(match[0])
+                    url = site["url"].replace("%id%", match[0])
+                    webview.load_uri(url)
+                    return False
+
+        return True
+
+    def on_load_failed(self, webview, event, url, error):
+        """ Handles page load failed event """
+        logger.info("Error loading page: %s Error: %s " % (url, error))
+
+
 class Application(Gtk.Application):
+    """ Main Application class """
 
     def __init__(self, *args, **kwargs):
+        logger.info("Starting application")
         super(Application, self).__init__(*args, application_id="net.brunopaz.argon-browser",
-                         flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
-                         **kwargs)
-        self.window = None
+                                          flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+                                          **kwargs)
+
+        self.app_dir = os.path.dirname(os.path.realpath(__file__))
+        self.load_config()
+
+        self.win = None
 
         self.add_main_option("url", ord("u"), GLib.OptionFlags.NONE,
                              GLib.OptionArg.STRING, "Command line test", None)
 
-    def do_activate(self):
-        # We only allow a single window and raise any existing ones
-        if not self.window:
-            # Windows are associated with the application
-            # when the last one is closed the application shuts down
-            self.window = AppWindow(application=self)
+    def load_config(self):
+        """ Load the application confiugraiton file """
+        config_dir = os.path.join(
+            GLib.get_user_config_dir(), APPLICATION_NAME)
+        config_file = os.path.join(config_dir, 'config.json')
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+            shutil.copy(os.path.join(self.app_dir, 'data',
+                                     'config.json'), config_file)
 
-        self.window.present()
+        with open(config_file) as f:
+            self.config = json.loads(f.read())
+
+    def get_config(self):
+        return self.config
+
+    def do_activate(self):
+        win = AppWindow(self)
 
     def do_command_line(self, command_line):
         self.options = command_line.get_options_dict()
@@ -147,10 +192,11 @@ class Application(Gtk.Application):
         return 0
 
 
-if __name__ == "__main__":
+def main():
     app = Application()
-    app.run(sys.argv)
+    exit_status = app.run(sys.argv)
+    sys.exit(exit_status)
 
 
-
-  
+if __name__ == "__main__":
+    main()

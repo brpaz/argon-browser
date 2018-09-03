@@ -1,0 +1,23 @@
+{
+    "homepage": "https://google.com",
+    "window_size": {
+        "width": 600,
+        "height": 400
+    },
+    "embeded_redirects": {
+        "enabled": true,
+        "sites": [{
+                "pattern": ".*youtube.com\/watch.*[\\?|\\&]v=(.*)",
+                "url": "https://www.youtube.com/embed/%id%"
+            },
+            {
+                "pattern": ".*vimeo.com\/(\\d+)",
+                "url": "https://player.vimeo.com/video/%id%"
+            }
+        ]
+    },
+    "mobile_version": [
+        "youtube.com",
+        "google.com"
+    ]
+}
