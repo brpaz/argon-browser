@@ -2,6 +2,7 @@
 
 > A minimalist floating browser for Linux, inspired by [Hellium](http://heliumfloats.com/) and [Fluid](https://itunes.apple.com/us/app/fluid-browser/id1077036385?mt=12)
 
+![](screenshot.png)
 ## Motivation
 
 Sometimes I want to see some video or to follow along with a tutorial, while keep working on other things. Thats why I decided to build this application.
