@@ -9,6 +9,7 @@ run:
 	@python main.py
 
 install:
+	@sudo rm -rf /opt/argon-browser
 	@sudo cp -R . /opt/argon-browser
 	@sudo cp data/argon.desktop /usr/local/share/applications/argon.browser.desktop
 	@sudo cp data/icons/icon.svg /usr/local/share/pixmaps/argon.browser.svg

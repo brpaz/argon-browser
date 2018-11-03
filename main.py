@@ -80,12 +80,15 @@ class AppWindow(object):
         self.webview.go_back()
 
     def on_btn_forward_clicked(self, widget):
+        """ Handle Forward button click """
         self.webview.go_forward()
 
     def on_btn_refresh_clicked(self, widget):
+        """ Handle page refresh """
         self.webview.reload()
 
     def on_btn_close_clicked(self, widget):
+        """ Closes the application """
         self.MainWindow.destroy()
 
     def on_search_input(self, widget):
@@ -111,6 +114,7 @@ class AppWindow(object):
         self.webview.load_uri(url)
 
     def on_btn_open_in_default_browser_clicked(self, widget):
+        """ Open the current page in the default browser """
         uri = self.webview.get_uri()
         Gio.app_info_launch_default_for_uri(uri)
         self.MainWindow.destroy()
@@ -128,6 +132,7 @@ class AppWindow(object):
             search_bar.set_text(url)
 
     def on_policy_decision(self, webview, decision, decision_type):
+        """ Intercept requests in order to change some stuff like replacing video urls with embeded versions """
         if decision_type == WebKit2.PolicyDecisionType.NAVIGATION_ACTION:
 
             if not self.app.config['embeded_redirects']['enabled']:
@@ -153,6 +158,7 @@ class Application(Gtk.Application):
     """ Main Application class """
 
     def __init__(self, *args, **kwargs):
+        """ Application Constructor """
         logger.info("Starting application")
         super(Application, self).__init__(*args, application_id="net.brunopaz.argon-browser",
                                           flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
@@ -186,6 +192,7 @@ class Application(Gtk.Application):
         win = AppWindow(self)
 
     def do_command_line(self, command_line):
+        """ Handle command line options. Not really used for now """
         self.options = command_line.get_options_dict()
 
         self.activate()
